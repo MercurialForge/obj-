@@ -210,7 +210,7 @@ def Import():
 			break
 
 	# Create skin cluster for the selected mesh using the generated skeleton
-	sCluster = cmds.skinCluster( theBones[0], theMesh, dr=4.5)[0]
+	sCluster = cmds.skinCluster( theBones[0], theMesh, dr=4, mi=4, omi=True)[0]
 	
 	# Tracking vert
 	vert = -1
@@ -233,11 +233,13 @@ def Import():
 			# Get vw values
 			vwValues = line.split()
 			
+			weights = []
 			# Assign joint, influence to vert
 			for x in range(0, int(vwValues[1])):
 				joint = vwValues[x * 2 + 2]
-				influence = float(vwValues[x * 2 + 3])
-				cmds.skinPercent( str(sCluster), theMesh + '.vtx' + '[' + str(vert) + ']', transformValue=( joint, influence ))
+				influence = float( vwValues[x * 2 + 3] )
+				weights.append( [joint, influence] )
+			cmds.skinPercent( str(sCluster), theMesh + '.vtx' + '[' + str(vert) + ']', transformValue=weights)
 				
 			cmds.progressBar(progressControl, edit=True, step=1)
 	
