@@ -9,13 +9,35 @@ if cmds.window(windowID, exists = True):
     cmds.deleteUI(windowID)
 
 # Make window
-window = cmds.window( windowID, title=windowID, widthHeight=(200, 30) )
+window = cmds.window( windowID, title=windowID, widthHeight=(200, 55) )
 cmds.columnLayout( adjustableColumn=True )
 cmds.text('obj++ Exporter Importer')
 cmds.button( label='Export', command=('Export()') )
 cmds.button( label='Import', command=('Import()') )
 cmds.setParent( '..' )
 cmds.showWindow( window )
+	
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
+# Run the Export of SKL and WGT
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+def Export():
+	# Open file for writing
+	path = Dialog("export")
+	openFile = open(path, 'w')
+	
+	root = cmds.ls()
+		
+	openFile.write('# skeleton output' + '\n')
+	ExportSKL(openFile, root)
+	print ('SKL section written successfully')
+	
+	openFile.write('\n')
+	openFile.write('# weight output' + '\n')
+	ExportWGT(openFile, root)
+	print ('WGT section written successfully')
+	openFile.close()
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
@@ -35,28 +57,24 @@ def Dialog(mode):
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
-# Exports the .skl ( rough support of vw )
+# Exports the .skl
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Command run for exporting the SKL
-def Export():
-	# Open file for writing
-	path = Dialog("export")
-	openFile = open(path, 'w')
-	openFile.write('# skeleton output' + '\n')
-
-	# Select the bone hierarchy
-	cmds.select( hi=True )
+def ExportSKL(outputFile, rootJoint):
+    
+    # Select the bone hierarchy
+	cmds.select( rootJoint, hi=True )
 	bones = cmds.ls( type='joint', sl=True )
-
+    
 	# Get bone count
 	count = len(bones)
-	print ( count )
+	
 	# Iterate through bones writing each and it's parent
 	for x in range(0, count):
 	    if (x != 0):
 	        WriteSKL(
-	        	openFile, 
+	        	outputFile, 
 	        	bones[x],
 	        	str( bones.index( cmds.listRelatives( [bones[x]], parent=True )[0] ) ),
 	        	str( cmds.xform( bones[x], q=1, ws=1, t=1 )[0] ),
@@ -65,24 +83,13 @@ def Export():
 	        	)
 	    else:
 	        WriteSKL(
-	        	openFile, 
+	        	outputFile, 
 	        	bones[x], 
 	        	str(-1), 
 	        	str( cmds.xform( bones[x], q=1, ws=1, t=1 )[0] ),
 	        	str( cmds.xform( bones[x], q=1, ws=1, t=1 )[1] ),
 	        	str( cmds.xform( bones[x], q=1, ws=1, t=1 )[2] )
 	        	)
-	print ('SKL section written successfully')
-
-	# Print a single WGT test
-	openFile.write('\n')
-	openFile.write('# weight output' + '\n')
-	bs = ["j1", "j2"]
-	ws = [str(0.333), str(0.6666)]
-	WriteWGT(openFile, str(2), bs, ws)
-	print ('WGT section written successfully')
-		
-	openFile.close()
 	return
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
@@ -96,15 +103,68 @@ def WriteSKL (outputFile, boneName, parentIndex, x, y, z):
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
+# Processes WGT export data
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #   
+def ExportWGT(outputFile, rootJoint):
+    # Select the bone hierarchy
+	cmds.select( rootJoint, hi=True )
+	bones = cmds.ls( type='joint', sl=True )
+
+	# Get bone count
+	count = len(bones)
+	
+	#############################################################
+	# List skinCuster relatives to the root joint
+	boneRelatives = []
+	for i in range(0, count):
+		boneRelatives =( cmds.listConnections( bones[i], type='skinCluster'))
+		if boneRelatives is None: 
+		    break
+	#############################################################
+	
+	# Get skinCluster
+	sCluster = boneRelatives[0]
+	
+	# List shape relatives to skinCluster
+	shapeRelatives = cmds.listConnections( sCluster, type='shape' )
+	
+	# Get owned effect shapes
+	shape = shapeRelatives[0]
+    
+    # Get total verts
+	cmds.select( shape )
+	vertCount = cmds.polyEvaluate( v=True )
+	
+	for x in range(0, vertCount):
+		#WriteWGT(outputFile, )
+
+	    # Get Bones
+		skinBones = []
+		tempBones = cmds.skinPercent(sCluster, shape + '.vtx' + '[' + str(x) + ']', ignoreBelow=0.01, query=True, transform=None)
+		skinBonesCount = len(tempBones)
+		for i in range(0, skinBonesCount):
+		    skinBones.append( tempBones[i] )
+		 
+		
+		# Get Weights
+		skinWeights  = cmds.skinPercent(sCluster, shape + '.vtx' + '[' + str(x) + ']', ignoreBelow=0.01, query=True, value=True )
+		
+		WriteWGT(outputFile, skinBonesCount, skinBones, skinWeights)
+	
+	return
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
 # Writes WGT data to the file
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 def WriteWGT (outputFile, weightCount, bones, weights):
     boneWeights = ""
     for i in range(0, int(weightCount)):
-        boneWeights += bones[i] + ' ' + weights[i] + ' '
+        boneWeights += bones[i] + ' ' + str(weights[i]) + ' '
 				
-    outputFile.write('vw' + ' ' + weightCount + ' ' + boneWeights + '\n')	
+    outputFile.write('vw' + ' ' + str(weightCount) + ' ' + boneWeights + '\n')	
     return
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
@@ -117,14 +177,13 @@ def Import():
     path = Dialog("import")
     skl = open(path,'r')
     for line in skl.readlines():
-        if not "bn" in line: continue
-        print(line)
-    	words = line.split()
-    	theBones.append(words[1])
-    	if (int(words[2]) == -1):
-    	    cmds.joint(p=( words[3], words[4], words[5] ), n=words[1] )
-    	else:
-    	    cmds.joint(theBones[int(words[2])], p=( words[3], words[4], words[5] ), n=words[1] )
+        if "bn" in line:
+        	words = line.split()
+        	theBones.append(words[1])
+        	if (int(words[2]) == -1):
+        	    cmds.joint(p=( words[3], words[4], words[5] ), n=words[1] )
+        	else:
+        	    cmds.joint(theBones[int(words[2])], p=( words[3], words[4], words[5] ), n=words[1] )
 	        
     skl.close()
     return
