@@ -9,11 +9,12 @@ if cmds.window(windowID, exists = True):
     cmds.deleteUI(windowID)
 
 # Make window
-window = cmds.window( windowID, title=windowID, widthHeight=(200, 55) )
+window = cmds.window( windowID, title=windowID, widthHeight=(200, 75) )
 cmds.columnLayout( adjustableColumn=True )
 cmds.text('obj++ Exporter Importer')
 cmds.button( label='Export', command=('Export()') )
 cmds.button( label='Import', command=('Import()') )
+progressControl = cmds.progressBar(width=200)
 cmds.setParent( '..' )
 cmds.showWindow( window )
 	
@@ -27,7 +28,7 @@ def Export():
 	path = Dialog("export")
 	openFile = open(path, 'w')
 	
-	root = cmds.ls()
+	root = cmds.ls(selection=True)
 		
 	openFile.write('# skeleton output' + '\n')
 	ExportSKL(openFile, root)
@@ -76,19 +77,27 @@ def ExportSKL(outputFile, rootJoint):
 	        WriteSKL(
 	        	outputFile, 
 	        	bones[x],
-	        	str( bones.index( cmds.listRelatives( [bones[x]], parent=True )[0] ) ),
-	        	str( cmds.xform( bones[x], q=1, ws=1, t=1 )[0] ),
-	        	str( cmds.xform( bones[x], q=1, ws=1, t=1 )[1] ),
-	        	str( cmds.xform( bones[x], q=1, ws=1, t=1 )[2] )
+	        	bones.index( cmds.listRelatives( [bones[x]], parent=True )[0] ),
+	        	cmds.joint( bones[x], q=1, r=1, p=1 )[0],
+	        	cmds.joint( bones[x], q=1, r=1, p=1  )[1],
+	        	cmds.joint( bones[x], q=1, r=1, p=1  )[2],
+	        	cmds.joint( bones[x], q=1, o=1  )[0],
+	        	cmds.joint( bones[x], q=1, o=1  )[1],
+	        	cmds.joint( bones[x], q=1, o=1  )[2],
+	        	cmds.joint( bones[x], q=1, roo=1  ),
 	        	)
 	    else:
 	        WriteSKL(
 	        	outputFile, 
 	        	bones[x], 
-	        	str(-1), 
-	        	str( cmds.xform( bones[x], q=1, ws=1, t=1 )[0] ),
-	        	str( cmds.xform( bones[x], q=1, ws=1, t=1 )[1] ),
-	        	str( cmds.xform( bones[x], q=1, ws=1, t=1 )[2] )
+	        	-1, 
+	        	cmds.joint( bones[x], q=1, r=1, p=1 )[0],
+	        	cmds.joint( bones[x], q=1, r=1, p=1  )[1],
+	        	cmds.joint( bones[x], q=1, r=1, p=1  )[2],
+	        	cmds.joint( bones[x], q=1, o=1  )[0],
+	        	cmds.joint( bones[x], q=1, o=1  )[1],
+	        	cmds.joint( bones[x], q=1, o=1  )[2],
+	        	cmds.joint( bones[x], q=1, roo=1  ),
 	        	)
 	return
 
@@ -97,8 +106,8 @@ def ExportSKL(outputFile, rootJoint):
 # Writes SKL data to the file
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-def WriteSKL (outputFile, boneName, parentIndex, x, y, z):				
-    outputFile.write('bn' + ' ' + boneName + ' ' + parentIndex + ' ' + x + ' ' + y + ' ' + z + '\n')	
+def WriteSKL (outputFile, boneName, parentIndex, x, y, z, rotx, roty, rotz, orientation):				
+    outputFile.write('bn {0} {1} {2} {3} {4} {5} {6} {7} {8}\n'.format(boneName, parentIndex, x, y, z, rotx, roty, rotz, orientation))	
     return
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
@@ -114,20 +123,14 @@ def ExportWGT(outputFile, rootJoint):
 	# Get bone count
 	count = len(bones)
 	
-	#############################################################
 	# List skinCuster relatives to the root joint
-	boneRelatives = []
-	for i in range(0, count):
-		boneRelatives =( cmds.listConnections( bones[i], type='skinCluster'))
-		if boneRelatives is None: 
-		    break
-	#############################################################
+	boneRelatives =( cmds.listConnections( bones[0], type='skinCluster'))
 	
 	# Get skinCluster
 	sCluster = boneRelatives[0]
 	
 	# List shape relatives to skinCluster
-	shapeRelatives = cmds.listConnections( sCluster, type='shape' )
+	shapeRelatives = cmds.skinCluster( sCluster, q=1, g=1 )
 	
 	# Get owned effect shapes
 	shape = shapeRelatives[0]
@@ -137,15 +140,12 @@ def ExportWGT(outputFile, rootJoint):
 	vertCount = cmds.polyEvaluate( v=True )
 	
 	for x in range(0, vertCount):
-		#WriteWGT(outputFile, )
-
 	    # Get Bones
 		skinBones = []
 		tempBones = cmds.skinPercent(sCluster, shape + '.vtx' + '[' + str(x) + ']', ignoreBelow=0.01, query=True, transform=None)
 		skinBonesCount = len(tempBones)
 		for i in range(0, skinBonesCount):
 		    skinBones.append( tempBones[i] )
-		 
 		
 		# Get Weights
 		skinWeights  = cmds.skinPercent(sCluster, shape + '.vtx' + '[' + str(x) + ']', ignoreBelow=0.01, query=True, value=True )
@@ -164,7 +164,7 @@ def WriteWGT (outputFile, weightCount, bones, weights):
     for i in range(0, int(weightCount)):
         boneWeights += bones[i] + ' ' + str(weights[i]) + ' '
 				
-    outputFile.write('vw' + ' ' + str(weightCount) + ' ' + boneWeights + '\n')	
+    outputFile.write('vw {0} {1}\n'.format(weightCount, boneWeights))	
     return
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
@@ -173,17 +173,72 @@ def WriteWGT (outputFile, weightCount, bones, weights):
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 def Import():
-    theBones = []
-    path = Dialog("import")
-    skl = open(path,'r')
-    for line in skl.readlines():
-        if "bn" in line:
-        	words = line.split()
-        	theBones.append(words[1])
-        	if (int(words[2]) == -1):
-        	    cmds.joint(p=( words[3], words[4], words[5] ), n=words[1] )
-        	else:
-        	    cmds.joint(theBones[int(words[2])], p=( words[3], words[4], words[5] ), n=words[1] )
-	        
-    skl.close()
-    return
+	# Get selected mesh, only the first one
+	theMesh = cmds.ls( selection=True )[0]
+	
+	# Deselect everything
+	cmds.select(clear=1)
+	
+	# Create list for bones
+	theBones = []
+	
+	# Open path
+	path = Dialog("import")
+	skl = open(path,'r')
+	
+	# Start creating bones
+	theLines = skl.readlines()
+	skl.close()
+	for line in theLines:
+		if "bn" in line:
+			# Get bn values
+			bnValues = line.split()
+			
+			# Write current bone to list, going in hierarchical order so all parents are created before children
+			theBones.append(bnValues[1])
+			
+			# Handle root bone then all children
+			if (int(bnValues[2]) == -1):
+				cmds.joint( n=bnValues[1], r=1, p=( bnValues[3], bnValues[4], bnValues[5] ), o=(bnValues[6], bnValues[7], bnValues[8]), roo=bnValues[9] )
+			else:
+				cmds.joint(theBones[int(bnValues[2])], n=bnValues[1], r=1, p=( bnValues[3], bnValues[4], bnValues[5] ), o=(bnValues[6], bnValues[7], bnValues[8]), roo=bnValues[9] )
+		# Skip comments
+		elif "#" in line:
+			continue
+		# Break after bn
+		else:
+			break
+
+	# Create skin cluster for the selected mesh using the generated skeleton
+	sCluster = cmds.skinCluster( theBones[0], theMesh, dr=4.5)[0]
+	
+	# Tracking vert
+	vert = -1
+	
+	# Initialize progress bar
+	cmds.select( theMesh )
+	vertCount = cmds.polyEvaluate( v=True )
+	cmds.progressBar( progressControl, edit=True, maxValue=vertCount )
+	cmds.select(clear=1)
+	
+	# Assign vertex weights
+	for line in theLines:
+		if cmds.progressBar(progressControl, query=True, isCancelled=True ) :
+		    break
+		    
+		if "vw" in line:
+			# Forward vert count
+			vert += 1
+			
+			# Get vw values
+			vwValues = line.split()
+			
+			# Assign joint, influence to vert
+			for x in range(0, int(vwValues[1])):
+				joint = vwValues[x * 2 + 2]
+				influence = float(vwValues[x * 2 + 3])
+				cmds.skinPercent( str(sCluster), theMesh + '.vtx' + '[' + str(vert) + ']', transformValue=( joint, influence ))
+				
+			cmds.progressBar(progressControl, edit=True, step=1)
+	
+	return
